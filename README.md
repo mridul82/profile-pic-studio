@@ -15,7 +15,9 @@ Everything runs on your own computer. Photos are never uploaded to any external 
   - Person size, left/right position, outline thickness
   - Soft drop shadow on/off
   - Transparent background on/off (for use on your own backgrounds)
+- **Fits round profile crops**: Facebook, Instagram and WhatsApp show profile pictures as a circle. The person is kept inside that circle, with the body clipped to the ring and the head free to pop out above it. A **Show round crop** toggle dims everything the platforms will hide (preview only, not in the download).
 - **Download as PNG** at 1080 × 1080, a size that works for WhatsApp, LinkedIn, Instagram, X and most other platforms.
+- **Background removal only**: the **Download background removed only** button saves just the person on a transparent background (`background-removed.png`), with no template or design. It is cropped to the person and at most 1600 px on the longest side.
 - **Drag and drop** or click to upload. Phone photos are rotated correctly using their EXIF data.
 
 ## Requirements

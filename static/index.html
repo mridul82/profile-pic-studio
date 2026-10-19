@@ -22,6 +22,7 @@
   .stage { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
     background: repeating-conic-gradient(#e9ecf2 0 25%, #fff 0 50%) 0 0 / 24px 24px; }
   canvas { width: 100%; height: 100%; display: block; }
+  .guide { position: absolute; inset: 0; border-radius: 50%; box-shadow: 0 0 0 999px rgba(20, 28, 45, .55); pointer-events: none; }
   .overlay { position: absolute; inset: 0; display: none; flex-direction: column; gap: 12px; align-items: center; justify-content: center;
     background: rgba(20, 28, 45, .62); color: #fff; text-align: center; padding: 20px; font-weight: 600; }
   .overlay.show { display: flex; }
@@ -67,12 +68,15 @@
   <div class="card preview">
     <div class="stage">
       <canvas id="canvas" width="1080" height="1080" aria-label="Profile picture preview"></canvas>
+      <div class="guide" id="guide"></div>
       <div class="overlay" id="overlay"><div class="spinner"></div><div id="overlayText">Removing background…</div></div>
     </div>
     <div class="actions">
       <button class="primary" id="download" disabled>Download PNG</button>
       <button id="change" disabled>Change photo</button>
+      <button id="cutout" disabled>Download background removed only</button>
     </div>
+    <label class="check" style="margin-top:12px"><input type="checkbox" id="guideToggle" checked> Show round crop (Facebook / Instagram / WhatsApp)</label>
   </div>
 
   <div class="card">
@@ -129,7 +133,7 @@ const TEMPLATES = [
   { name: "Candy",   bg: "#ffe4ef", c1: "#ff9ac1", c2: "#ff5c93", ring: "#ffffff", outline: "#ffffff" },
   { name: "Mono",    bg: "#f2f2f2", c1: "#5a5a5a", c2: "#111111", ring: "#111111", outline: "#ffffff" },
 ];
-const state = { ...TEMPLATES[0], ringWidth: 14, outlineWidth: 10, circleSize: 0.82, circleY: 0.56,
+const state = { ...TEMPLATES[0], ringWidth: 14, outlineWidth: 10, circleSize: 0.82, circleY: 0.5,
                 personHeight: 0.88, personX: 0, shadow: true, transparent: false };
 let person = null;
 
@@ -176,6 +180,9 @@ function render() {
   const art = outlinedPerson();
   const x = (S - art.width) / 2 + S * state.personX, y = S - art.height - S * 0.03;
   ctx.save();
+  // FB/Instagram/WhatsApp crop to a circle: keep the person inside it, body below circle centre cut to the ring (head pops out)
+  ctx.beginPath(); ctx.arc(S / 2, S / 2, S / 2, 0, Math.PI * 2); ctx.clip();
+  ctx.beginPath(); ctx.rect(0, 0, S, cy); ctx.moveTo(cx + r, cy); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.clip();
   if (state.shadow) { ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 24; ctx.shadowOffsetX = 6; ctx.shadowOffsetY = 8; }
   ctx.drawImage(art, x, y);
   ctx.restore();
@@ -226,7 +233,7 @@ async function upload(file) {
     person = img;
     render();
     msg("Done! Pick a template or customize, then download.");
-    $("download").disabled = $("change").disabled = false;
+    $("download").disabled = $("change").disabled = $("cutout").disabled = false;
   } catch (e) {
     msg(e.message === "Failed to fetch" ? "Can't reach the server. Is server.py still running?" : e.message, true);
   } finally {
@@ -243,10 +250,11 @@ $("file").onchange = e => upload(e.target.files[0]);
 ["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
 drop.addEventListener("drop", e => upload(e.dataTransfer.files[0]));
 
-$("download").onclick = () => canvas.toBlob(blob => {
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob); a.download = "profile-picture.png"; a.click();
-}, "image/png");
+$("guideToggle").onchange = e => $("guide").hidden = !e.target.checked;
+
+const save = (href, name) => { const a = document.createElement("a"); a.href = href; a.download = name; a.click(); };
+$("download").onclick = () => canvas.toBlob(blob => save(URL.createObjectURL(blob), "profile-picture.png"), "image/png");
+$("cutout").onclick = () => save(person.src, "background-removed.png");
 
 syncInputs(); render();
 </script>
