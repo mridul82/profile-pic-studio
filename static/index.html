@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Profile Pic Studio</title>
+<style>
+  :root {
+    --bg: #f4f6fb; --card: #fff; --text: #1b2333; --muted: #667085;
+    --line: #e3e7ef; --accent: #2f6fed; --accent-ink: #fff; --danger: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); }
+  header { padding: 20px 24px 8px; max-width: 1180px; margin: auto; }
+  h1 { margin: 0; font-size: 24px; }
+  header p { margin: 4px 0 0; color: var(--muted); }
+  main { max-width: 1180px; margin: auto; padding: 16px 24px 40px; display: grid; gap: 20px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; padding: 12px 16px 32px; } header { padding: 16px 16px 4px; } }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px; }
+  .preview { position: sticky; top: 16px; }
+  @media (max-width: 860px) { .preview { position: static; } }
+  .stage { position: relative; aspect-ratio: 1; border-radius: 10px; overflow: hidden;
+    background: repeating-conic-gradient(#e9ecf2 0 25%, #fff 0 50%) 0 0 / 24px 24px; }
+  canvas { width: 100%; height: 100%; display: block; }
+  .overlay { position: absolute; inset: 0; display: none; flex-direction: column; gap: 12px; align-items: center; justify-content: center;
+    background: rgba(20, 28, 45, .62); color: #fff; text-align: center; padding: 20px; font-weight: 600; }
+  .overlay.show { display: flex; }
+  .spinner { width: 42px; height: 42px; border: 4px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  button, .btn { font: inherit; font-weight: 600; border-radius: 10px; padding: 10px 16px; cursor: pointer; border: 1px solid var(--line); background: #fff; color: var(--text); }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); flex: 1; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  button:focus-visible, input:focus-visible, .drop:focus-visible { outline: 3px solid #9bbcff; outline-offset: 2px; }
+  h2 { font-size: 16px; margin: 0 0 12px; display: flex; gap: 8px; align-items: center; }
+  .step { display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 13px; }
+  section + section { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); }
+  .drop { border: 2px dashed #b9c3d6; border-radius: 12px; padding: 26px 16px; text-align: center; cursor: pointer; transition: .15s; }
+  .drop:hover, .drop.over { border-color: var(--accent); background: #eef3ff; }
+  .drop strong { color: var(--accent); }
+  .drop small { display: block; color: var(--muted); margin-top: 4px; }
+  .msg { margin-top: 10px; font-size: 14px; color: var(--muted); min-height: 1.2em; }
+  .msg.error { color: var(--danger); font-weight: 600; }
+  .templates { display: grid; grid-template-columns: repeat(auto-fill, minmax(86px, 1fr)); gap: 10px; }
+  .tpl { padding: 8px; border-radius: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; }
+  .tpl[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+  .swatch { width: 58px; height: 58px; border-radius: 8px; display: grid; place-items: center; }
+  .swatch i { width: 40px; height: 40px; border-radius: 50%; display: block; }
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px 16px; }
+  label.color { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+  input[type=color] { width: 40px; height: 34px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: #fff; cursor: pointer; }
+  .slider { display: grid; gap: 4px; font-size: 14px; }
+  .slider span { display: flex; justify-content: space-between; }
+  .slider output { color: var(--muted); }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  label.check { display: flex; gap: 8px; align-items: center; font-size: 14px; }
+  .hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Profile Pic Studio</h1>
+  <p>Upload a photo → background removed → pick a design → download. Everything runs on this computer.</p>
+</header>
+
+<main>
+  <div class="card preview">
+    <div class="stage">
+      <canvas id="canvas" width="1080" height="1080" aria-label="Profile picture preview"></canvas>
+      <div class="overlay" id="overlay"><div class="spinner"></div><div id="overlayText">Removing background…</div></div>
+    </div>
+    <div class="actions">
+      <button class="primary" id="download" disabled>Download PNG</button>
+      <button id="change" disabled>Change photo</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <section>
+      <h2><span class="step">1</span> Upload your photo</h2>
+      <div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload photo">
+        <strong>Click to choose</strong> or drag a photo here
+        <small>JPG or PNG · full-body or half-body photo works best</small>
+      </div>
+      <input type="file" id="file" accept="image/*" hidden>
+      <div class="msg" id="msg"></div>
+    </section>
+
+    <section>
+      <h2><span class="step">2</span> Choose a template</h2>
+      <div class="templates" id="templates"></div>
+    </section>
+
+    <section>
+      <h2><span class="step">3</span> Customize</h2>
+      <p class="hint">Changes apply instantly.</p>
+      <div class="grid2">
+        <label class="color"><input type="color" data-key="bg"> Background</label>
+        <label class="color"><input type="color" data-key="c1"> Circle colour 1</label>
+        <label class="color"><input type="color" data-key="c2"> Circle colour 2</label>
+        <label class="color"><input type="color" data-key="ring"> Circle border</label>
+        <label class="color"><input type="color" data-key="outline"> Person outline</label>
+      </div>
+      <div class="grid2" style="margin-top:16px">
+        <label class="slider"><span>Circle border <output></output></span><input type="range" data-key="ringWidth" min="0" max="40"></label>
+        <label class="slider"><span>Outline thickness <output></output></span><input type="range" data-key="outlineWidth" min="0" max="30"></label>
+        <label class="slider"><span>Circle size <output></output></span><input type="range" data-key="circleSize" min="0.5" max="1" step="0.01"></label>
+        <label class="slider"><span>Circle up/down <output></output></span><input type="range" data-key="circleY" min="0.4" max="0.7" step="0.01"></label>
+        <label class="slider"><span>Person size <output></output></span><input type="range" data-key="personHeight" min="0.5" max="1" step="0.01"></label>
+        <label class="slider"><span>Person left/right <output></output></span><input type="range" data-key="personX" min="-0.3" max="0.3" step="0.01"></label>
+      </div>
+      <div class="grid2" style="margin-top:16px">
+        <label class="check"><input type="checkbox" data-key="shadow"> Soft shadow</label>
+        <label class="check"><input type="checkbox" data-key="transparent"> Transparent background</label>
+      </div>
+    </section>
+  </div>
+</main>
+
+<script>
+const S = 1080;
+const TEMPLATES = [
+  { name: "Ocean",   bg: "#0c1e3c", c1: "#4fb3f0", c2: "#0b5cad", ring: "#ffffff", outline: "#ffffff" },
+  { name: "Sunset",  bg: "#2b1033", c1: "#ffb36b", c2: "#e8467c", ring: "#ffe3c2", outline: "#ffffff" },
+  { name: "Forest",  bg: "#0f2a1f", c1: "#7ed6a5", c2: "#1e7a4e", ring: "#e8f5ec", outline: "#ffffff" },
+  { name: "Royal",   bg: "#1a1236", c1: "#b58cff", c2: "#5b2bc4", ring: "#ffd66b", outline: "#ffffff" },
+  { name: "Gold",    bg: "#111111", c1: "#f7d774", c2: "#b8862b", ring: "#f7d774", outline: "#ffffff" },
+  { name: "Clean",   bg: "#ffffff", c1: "#4fb3f0", c2: "#0b5cad", ring: "#0b5cad", outline: "#ffffff" },
+  { name: "Candy",   bg: "#ffe4ef", c1: "#ff9ac1", c2: "#ff5c93", ring: "#ffffff", outline: "#ffffff" },
+  { name: "Mono",    bg: "#f2f2f2", c1: "#5a5a5a", c2: "#111111", ring: "#111111", outline: "#ffffff" },
+];
+const state = { ...TEMPLATES[0], ringWidth: 14, outlineWidth: 10, circleSize: 0.82, circleY: 0.56,
+                personHeight: 0.88, personX: 0, shadow: true, transparent: false };
+let person = null;
+
+const $ = id => document.getElementById(id);
+const canvas = $("canvas"), ctx = canvas.getContext("2d");
+const inputs = document.querySelectorAll("[data-key]");
+
+function newCanvas(w, h) { const c = document.createElement("canvas"); c.width = Math.ceil(w); c.height = Math.ceil(h); return c; }
+
+// Person scaled to size, with a solid outline grown around its shape.
+function outlinedPerson() {
+  let h = S * state.personHeight, w = person.width * h / person.height;
+  if (w > S * 0.95) { w = S * 0.95; h = person.height * w / person.width; }
+  const ow = state.outlineWidth, pad = ow + 2;
+  const base = newCanvas(w + 2 * pad, h + 2 * pad);
+  base.getContext("2d").drawImage(person, pad, pad, w, h);
+  if (!ow) return base;
+  const sil = newCanvas(base.width, base.height), s = sil.getContext("2d");
+  s.drawImage(base, 0, 0);
+  s.globalCompositeOperation = "source-in";
+  s.fillStyle = state.outline;
+  s.fillRect(0, 0, sil.width, sil.height);
+  const out = newCanvas(base.width, base.height), o = out.getContext("2d");
+  for (let i = 0; i < 48; i++) {           // stamp silhouette in a ring = outline of width ow
+    const a = i / 48 * Math.PI * 2;
+    o.drawImage(sil, Math.cos(a) * ow, Math.sin(a) * ow);
+  }
+  o.drawImage(base, 0, 0);
+  return out;
+}
+
+function render() {
+  ctx.clearRect(0, 0, S, S);
+  if (!state.transparent) { ctx.fillStyle = state.bg; ctx.fillRect(0, 0, S, S); }
+  const r = S * state.circleSize / 2, cx = S / 2, cy = S * state.circleY;
+  if (state.ringWidth > 0) {
+    ctx.beginPath(); ctx.arc(cx, cy, r + state.ringWidth, 0, Math.PI * 2);
+    ctx.fillStyle = state.ring; ctx.fill();
+  }
+  const g = ctx.createLinearGradient(cx - r, cy - r, cx + r, cy + r);
+  g.addColorStop(0, state.c1); g.addColorStop(1, state.c2);
+  ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill();
+  if (!person) return;
+  const art = outlinedPerson();
+  const x = (S - art.width) / 2 + S * state.personX, y = S - art.height - S * 0.03;
+  ctx.save();
+  if (state.shadow) { ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = 24; ctx.shadowOffsetX = 6; ctx.shadowOffsetY = 8; }
+  ctx.drawImage(art, x, y);
+  ctx.restore();
+}
+
+function syncInputs() {
+  inputs.forEach(el => {
+    const k = el.dataset.key;
+    if (el.type === "checkbox") el.checked = state[k]; else el.value = state[k];
+    const out = el.closest(".slider")?.querySelector("output");
+    if (out) out.textContent = el.step && el.step < 1 ? Math.round(state[k] * 100) + "%" : state[k] + " px";
+  });
+  document.querySelectorAll(".tpl").forEach(b => {
+    const t = TEMPLATES[b.dataset.i];
+    b.setAttribute("aria-pressed", ["bg", "c1", "c2", "ring", "outline"].every(k => t[k] === state[k]));
+  });
+}
+
+inputs.forEach(el => el.addEventListener("input", () => {
+  const k = el.dataset.key;
+  state[k] = el.type === "checkbox" ? el.checked : el.type === "range" ? +el.value : el.value;
+  syncInputs(); render();
+}));
+
+TEMPLATES.forEach((t, i) => {
+  const b = document.createElement("button");
+  b.className = "tpl"; b.dataset.i = i; b.type = "button";
+  b.innerHTML = `<span class="swatch" style="background:${t.bg}"><i style="background:linear-gradient(135deg,${t.c1},${t.c2});box-shadow:0 0 0 3px ${t.ring}"></i></span>${t.name}`;
+  b.onclick = () => { Object.assign(state, t); syncInputs(); render(); };
+  $("templates").append(b);
+});
+
+// --- upload ---
+const msg = (text, error = false) => { $("msg").textContent = text; $("msg").className = "msg" + (error ? " error" : ""); };
+
+async function upload(file) {
+  if (!file) return;
+  if (!file.type.startsWith("image/")) return msg("Please choose an image file (JPG or PNG).", true);
+  $("overlay").classList.add("show");
+  $("overlayText").textContent = "Removing background… this can take up to a minute.";
+  msg(`Processing ${file.name}…`);
+  try {
+    const res = await fetch("/api/cutout", { method: "POST", body: file });
+    if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || `Server error ${res.status}`);
+    const img = new Image();
+    img.src = URL.createObjectURL(await res.blob());
+    await img.decode();
+    person = img;
+    render();
+    msg("Done! Pick a template or customize, then download.");
+    $("download").disabled = $("change").disabled = false;
+  } catch (e) {
+    msg(e.message === "Failed to fetch" ? "Can't reach the server. Is server.py still running?" : e.message, true);
+  } finally {
+    $("overlay").classList.remove("show");
+    $("file").value = "";
+  }
+}
+
+const drop = $("drop");
+drop.onclick = $("change").onclick = () => $("file").click();
+drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("file").click(); } };
+$("file").onchange = e => upload(e.target.files[0]);
+["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+["dragleave", "drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+drop.addEventListener("drop", e => upload(e.dataTransfer.files[0]));
+
+$("download").onclick = () => canvas.toBlob(blob => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob); a.download = "profile-picture.png"; a.click();
+}, "image/png");
+
+syncInputs(); render();
+</script>
+</body>
+</html>
